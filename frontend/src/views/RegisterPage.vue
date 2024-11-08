@@ -1,4 +1,5 @@
 <template>
+    <NavBar/>
 <div class="container mt-5">
 <h2>Register Here</h2>
 <form @submit.prevent="register">
@@ -25,6 +26,8 @@
 </template>
 
 <script>
+import NavBar from '@/components/NavBar.vue';
+
 
 export default {
     name: "RegisterPage",
@@ -35,6 +38,9 @@ export default {
             password: '',
             isManager: false
         }
+    },
+    components:{
+        NavBar
     },
     methods:{
         async register(){
@@ -57,8 +63,8 @@ export default {
             }
             else{
                 alert(data.message)
+                this.$router.push('/login')
             }
-
         }catch(error){
             console.log(error)
         }   
