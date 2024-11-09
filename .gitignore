@@ -1,3 +1,4 @@
 frontend/node_modules
 backend/instance
 backend/__pycache__
+backend/uploads

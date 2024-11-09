@@ -1,8 +1,10 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from config import Config
 from models import *
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies
+from werkzeug.utils import secure_filename
+import os 
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -130,6 +132,135 @@ def logout():
     response = jsonify({"message":"Logged out successfully"})
     unset_jwt_cookies(response)
     return response, 200
+
+#CRUD ON CATEGORIES
+#CREATE
+@app.route("/category", methods=["POST"])
+@jwt_required()
+def create_category():
+    current_user = get_jwt_identity()
+    if current_user['role'] != 'admin':
+        return jsonify({"error":"UNAUTHORIZED"}), 401
+
+    name = request.form.get("name")
+    description = request.form.get("description")
+    advertisement = request.files.get("advertisement") # PDF FILE
+    
+    if not name or not description or not advertisement:
+        return jsonify({"error":"Required Fields are Missing"}), 400
+    
+    existing_category = Category.query.filter_by(name=name).first()
+    if existing_category:
+        return jsonify({"error":"Category Already Exists"}), 400
+    
+    advertisement_filename = secure_filename(name + ".pdf")
+    advertisement_document_path = os.path.join(app.config["UPLOAD_FOLDER"], advertisement_filename)
+    os.makedirs(os.path.dirname(advertisement_document_path), exist_ok=True)
+    advertisement.save(advertisement_document_path)
+    print(advertisement_document_path)
+    try:
+        category = Category(name=name, description=description, category_advertisement_document_path=advertisement_filename)
+        db.session.add(category)
+        db.session.commit()
+        return jsonify({"message":"Category Created Successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error":str(e)}), 500
+
+# READ ALL CATEGORIES
+@app.route("/categories", methods=["GET"])
+def get_categories():
+    categories = Category.query.all()
+    categories_data = []
+    for category in categories:
+        categories_data.append({
+            "id": category.id,
+            "name": category.name,
+            "description": category.description,
+            "category_advertisement_document_path": category.category_advertisement_document_path,
+            "products": [product.name for product in category.products]
+        })
+    return jsonify({"categories":categories_data}), 200
+    
+
+# READ A SINGLE CATEGORY BY ID
+@app.route("/category/<int:id>", methods=["GET"])
+def get_category(id):
+    category = Category.query.filter_by(id=id).first()
+    if not category:
+        return jsonify({"error":"Category not found"}), 404
+    category_data = {
+        "id": category.id,
+        "name": category.name,
+        "description": category.description,
+        "category_advertisement_document_path": category.category_advertisement_document_path,
+        "products": [product.name for product in category.products]
+    }
+    return jsonify(category_data), 200
+
+# SERVE PDF IN BACKEND
+@app.route("/category/<int:id>/advertisement", methods=["GET"])
+def view_advertisement(id):
+    category = Category.query.filter_by(id=id).first()
+    if not category:
+        return jsonify({"error":"Category not found"}), 404
+    advertisement = category.category_advertisement_document_path
+    advertisement_path = os.path.join(app.config["UPLOAD_FOLDER"], advertisement)
+    return send_file(advertisement_path, mimetype="application/pdf")
+   
+# UPDATE A CATEGORY BY ID
+@app.route("/category/<int:id>", methods=["PUT"])
+@jwt_required()
+def update_category(id):
+    current_user = get_jwt_identity()
+    if current_user['role'] != 'admin':
+        return jsonify({"error":"UNAUTHORIZED"}), 401
+
+    category = Category.query.filter_by(id=id).first()
+    if not category:
+        return jsonify({"error":"Category not found"}), 404
+    name = request.form.get("name")
+    description = request.form.get("description")
+    advertisement = request.files.get("advertisement") # PDF FILE
+
+    if advertisement:
+        advertisement_filename = secure_filename(name + ".pdf")
+        advertisement_document_path = os.path.join(app.config["UPLOAD_FOLDER"], advertisement_filename)
+        os.makedirs(os.path.dirname(advertisement_document_path), exist_ok=True)
+        advertisement.save(advertisement_document_path)
+        category.category_advertisement_document_path = advertisement_filename
+    
+    if not(name==""):
+        category.name = name
+
+    if not(description==""):
+        category.description = description
+    
+    try:
+        db.session.commit()
+        return jsonify({"message":"Category Updated Successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error":str(e)}), 500
+    
+# DELETE A CATEGORY BY ID
+@app.route("/category/<int:id>", methods=["DELETE"])
+@jwt_required()
+def delete_category(id):
+    current_user = get_jwt_identity()
+    if current_user['role'] != 'admin':
+        return jsonify({"error":"UNAUTHORIZED"}), 401
+
+    category = Category.query.filter_by(id=id).first()
+    if not category:
+        return jsonify({"error":"Category not found"}), 404
+    try:
+        db.session.delete(category)
+        db.session.commit()
+        return jsonify({"message":"Category Deleted Successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error":str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug = True)

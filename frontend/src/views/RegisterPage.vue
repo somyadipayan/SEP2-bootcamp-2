@@ -10,11 +10,11 @@
   </div>
   <div class="mb-3">
     <label for="username" class="form-label">Username</label>
-    <input v-model="username" type="text" class="form-control" id="username">
+    <input v-model="username" type="text" class="form-control" id="username" required>
   </div>
   <div class="mb-3">
     <label for="password" class="form-label">Password</label>
-    <input  v-model="password" type="password" class="form-control" id="password">
+    <input  v-model="password" type="password" class="form-control" id="password" required>
   </div>
   <div class="mb-3 form-check">
     <input  v-model="isManager" type="checkbox" class="form-check-input" id="isManager">

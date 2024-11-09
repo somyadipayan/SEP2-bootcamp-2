@@ -21,6 +21,21 @@ const routes = [
     component: LoginPage
   },
   {
+    path: "/create-category",
+    name: "create-category",
+    component: () => import("@/views/CreateCategory.vue")
+  },
+  {
+    path: "/all-categories",
+    name: "all-categories",
+    component: () => import("@/views/AllCategories.vue")
+  },
+  {
+    path: "/update-category/:id",
+    name: "update-category",
+    component: () => import("@/views/UpdateCategory.vue")
+  },
+  {
     path: '/about',
     name: 'about',
     // route level code-splitting
