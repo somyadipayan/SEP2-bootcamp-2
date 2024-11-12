@@ -261,6 +261,261 @@ def delete_category(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error":str(e)}), 500
+    
+# CRUD ON PRODUCTS
+# CREATE A PRODUCT # Can be only done by admin and Managers
+@app.route("/product", methods=["POST"])
+@jwt_required()
+def create_product():
+    current_user = get_jwt_identity()
+    # if current user is a user
+    if current_user['role'] == 'user':
+        return jsonify({"error":"UNAUTHORIZED"}), 401
+    data = request.json
+    # name, price, unit, quantity, category_id, creator_id
+    category_id = data.get("category_id")
+    name = data.get("name")
+    price = data.get("price")
+    unit = data.get("unit")
+    quantity = data.get("quantity")
+    creator_id = current_user['id']
+
+    if not category_id or not name or not price or not unit or not quantity or not creator_id:
+        return jsonify({"error":"Required Fields are Missing"}), 400
+    
+    category = Category.query.filter_by(id=category_id).first()
+    if not category:
+        return jsonify({"error":"Category not found"}), 404
+    
+    product = Product.query.filter_by(name=name).first()
+    if product:
+        return jsonify({"error":"Product already exists"}), 409
+    
+    if price <= 0:
+        return jsonify({"error":"Price must be greater than 0"}), 400
+
+    if quantity <= 0:
+        return jsonify({"error":"Quantity must be greater than 0"}), 400
+
+    try:
+        product = Product(name=name, price=price, unit=unit, quantity=quantity, category_id=category_id, creator_id=creator_id)
+        db.session.add(product)
+        db.session.commit()
+        return jsonify({"message":"Product Created Successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error":str(e)}), 500
+
+# GET ALL PRODUCTS
+@app.route("/product", methods=["GET"])
+def get_products():
+    categories = Category.query.all()
+    data = []
+    for category in categories:
+        # Populating products for a single category
+        products = []
+        for product in category.products:
+            products.append({
+                "id": product.id,
+                "name": product.name,
+                "price": product.price,
+                "unit": product.unit,
+                "quantity": product.quantity,
+                "creator_id": product.creator_id,
+                "creator": product.creator.username
+            })
+        data.append({
+            "id":category.id,
+            "name":category.name,
+            "pdf":category.category_advertisement_document_path,
+            "products": products
+        })
+    return jsonify(data), 200
+
+# get a single product
+@app.route("/product/<int:id>", methods=["GET"])
+def get_product(id):
+    product = Product.query.filter_by(id=id).first()
+    if not product:
+        return jsonify({"error":"Product not found"}), 404
+    product_data = {
+                "id": product.id,
+                "name": product.name,
+                "price": product.price,
+                "unit": product.unit,
+                "quantity": product.quantity,
+                "creator_id": product.creator_id,
+                "creator": product.creator.username,
+                "category_id": product.category_id,
+                "category": product.category.name
+                }
+    
+    return jsonify(product_data), 200
+
+# UPDATE A PRODUCT # Can be only done by admin and Managers
+@app.route("/product/<int:id>", methods=["PUT"])
+@jwt_required()
+def update_product():
+    current_user = get_jwt_identity()
+    # if current user is a user
+    if current_user['role'] == 'user':
+        return jsonify({"error":"UNAUTHORIZED"}), 401
+    
+    product = Product.query.filter_by(id=id).first()
+
+    if not product:
+        return jsonify({"error":"Product not found"}), 404
+
+    data = request.json
+
+    name = data.get("name")
+    price = data.get("price")
+    unit = data.get("unit")
+    quantity = data.get("quantity")
+
+    if not name or not price or not unit or not quantity:
+        return jsonify({"error":"Required Fields are Missing"}), 400
+    
+    if price <= 0:
+        return jsonify({"error":"Price must be greater than 0"}), 400
+
+    if quantity <= 0:
+        return jsonify({"error":"Quantity must be greater than 0"}), 400
+    
+    product.name = name
+    product.quantity = quantity
+    product.price = price
+    product.unit - unit
+
+    try: 
+        db.session.commit()
+        return jsonify({"message":f"Product {product.name} updated Successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error":str(e)}), 500
+    
+# DELETE A PRODUCT
+
+@app.route("/product/<int:id>", methods=["DELETE"])
+@jwt_required()
+def delete_product():
+    current_user = get_jwt_identity()
+    # if current user is a user
+    if current_user['role'] == 'user':
+        return jsonify({"error":"UNAUTHORIZED"}), 401
+        
+    product = Product.query.filter_by(id=id).first()
+
+    if not product:
+        return jsonify({"error":"Product not found"}), 404    
+    try:
+        db.session.delete(product)
+        db.session.commit()
+        return jsonify({"message":f"Product deleted Successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error":str(e)}), 500
+
+# CART
+# Add to Cart
+@app.route("/add-to-cart", methods=['POST'])
+@jwt_required()
+def add_to_cart():
+    current_user = get_jwt_identity()
+    if current_user['role'] != 'user':
+        return jsonify({"error":"You're not supposed to do this"}), 401
+    data = request.json
+
+    product_id = data.get("product_id")
+    quantity = data.get("quantity")
+
+    if not product_id or not quantity:
+        return jsonify({"error":"Required Fields are Missing"}), 400
+    
+    product = Product.query.filter_by(id=product_id).first()
+
+    if not product:
+        return jsonify({"error":"Product not found"}), 404  
+
+    if quantity <= 0:
+        return jsonify({"error":"Quantity must be greater than 0"}), 400
+    
+    if product.quantity <= quantity:
+        return jsonify({"error":"Not enough products in stock"}), 400  
+
+    user_cart = ShoppingCart.query.filter_by(user_id=current_user["id"]).first()
+
+    if not user_cart:
+        user_cart = ShoppingCart(user_id=current_user["id"])
+        try: 
+            db.session.add(user_cart)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error":str(e)}), 500 
+
+    cart_item = CartItems.query.filter_by(shopping_cart_id=user_cart.id,product_id=product_id).first()
+
+    if cart_item:
+        cart_item.quantity += quantity
+    else:
+        cart_item = CartItems(shopping_cart_id=user_cart.id,
+                            product_id=product_id,
+                            quantity=quantity)
+        db.session.add(cart_item)
+
+    try: 
+        db.session.commit()
+        return jsonify({"message":f"{product.name} added to cart Successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error":str(e)}), 500 
+
+# VIEW CART
+
+# UPDATE THE CART ITEM (PUT)
+
+# REMOVE THE CART ITEM (DELETE)
+
+# CLEAR THE CART (DELETE)
+
+# ORDER
+@app.route("/place-order", methods=["POST"])
+@jwt_required()
+def place_order():
+    current_user = get_jwt_identity()
+    if current_user['role'] != 'user':
+        return jsonify({"error":"You're not supposed to do this"}), 401
+    user_cart = ShoppingCart.query.filter_by(user_id=current_user["id"]).first()
+    if not user_cart:
+        return jsonify({"message":"Your Cart is empty!"}), 201
+    order_items = []
+    total_amount = 0
+    for item in user_cart.cart_items:
+        # QUANTITY CUSTOMER WANTS TO BUY >= QUANTITY IN STOCK
+        if item.quantity >= item.product.quantity:
+            return jsonify({"error":"Not enough products in stock"}), 400  
+        total_amount += item.product.price * item.quantity
+        order_item = OrderItems(product_id=item.product_id,
+                                 quantity = item.quantity
+                                )
+        order_items.append(order_item)
+        item.product.quantity -= item.quantity
+    new_order = Order(user_id = current_user["id"],
+                      total_amount = total_amount,
+                      order_items = order_items
+                      )
+    try:
+        db.session.add(new_order)
+        db.session.delete(user_cart)
+        db.session.commit()
+        return jsonify({"message":"Order Placed Successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error":str(e)}), 500 
+
+
+
 
 if __name__ == "__main__":
     app.run(debug = True)

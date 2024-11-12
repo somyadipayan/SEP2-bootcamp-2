@@ -49,8 +49,6 @@ export default{
             else{
                 localStorage.setItem("access_token", data.access_token)
                 alert(data.message)
-                // const token = localStorage.getItem("access_token")
-                // console.log(token)
                 // Push/Redirect to HomePage
                 this.$router.push('/')
             }
