@@ -4,7 +4,8 @@ from models import *
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies
 from werkzeug.utils import secure_filename
-import os 
+import os
+from tools import workers, tasks, mailer
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -13,7 +14,17 @@ app.config.from_object(Config)
 db.init_app(app)
 bcrypt.init_app(app)
 jwt = JWTManager(app)
+mailer.init_app(app)
 
+celery = workers.celery
+celery.conf.update(
+    broker_url=app.config["CELERY_BROKER_URL"],
+    result_backend=app.config["CELERY_RESULT_BACKEND"]
+)
+
+celery.Task = workers.ContextTask
+
+app.app_context().push()
 
 def createAdmin():
     existing_admin = User.query.filter_by(role='admin').first()
@@ -37,6 +48,9 @@ CORS(app, supports_credentials=True)
 
 @app.route("/")
 def test():
+    # testing celery
+    # mailer.send_email("a@b.com", "test", "test")
+    # tasks.send_daily_email.delay()
     return "Hello World"
 
 @app.route("/register", methods=["POST"])
@@ -509,6 +523,7 @@ def place_order():
         db.session.add(new_order)
         db.session.delete(user_cart)
         db.session.commit()
+        tasks.send_order_summary.delay(new_order.id)
         return jsonify({"message":"Order Placed Successfully"}), 200
     except Exception as e:
         db.session.rollback()
