@@ -8,3 +8,5 @@ class Config:
     CELERY_RESULT_BACKEND = "redis://localhost:6379/2" # DB 2
     MAIL_SERVER = "localhost"
     MAIL_PORT = 1025
+    CACHE_TYPE = "redis"
+    CACHE_REDIS_URL = "redis://localhost:6379/0"

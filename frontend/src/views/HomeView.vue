@@ -7,12 +7,12 @@
     <div v-else>
       <h2>Welcome please Login</h2>
     </div>
-
+    <button class = "btn btn-primary" @click="order">Order</button>
     <!-- SERACH BAR -->
     <div class="form-group mt-5 mb-3">
       <input type="text" class="form-control" id="search" v-model="searchQuery" placeholder="Search for products here!">
     </div>
-
+    
     <div v-for="category in filteredCategories" :key="category.id">
       <h4>{{ category.name }}</h4>
       <p>{{ category.description }}</p>
@@ -105,6 +105,26 @@ export default {
         if (response.ok) {
           alert(data.message);
           this.quantities = {};
+        } else {
+          alert(data.error);
+        }
+      } catch (error) {
+        console.error("Error adding product to cart:", error);
+      }
+    },
+
+    async order() {
+      try {
+        const response = await fetch('http://localhost:5000/place-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          }
+        });
+        const data = await response.json();
+        if (response.ok) {
+          alert(data.message);
         } else {
           alert(data.error);
         }

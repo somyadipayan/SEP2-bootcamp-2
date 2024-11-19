@@ -26,6 +26,12 @@ const routes = [
     component: () => import("@/views/CreateCategory.vue")
   },
   {
+    path: "/admin-dashboard",
+    name: "admin-dashboard",
+    component: () => import("@/views/AdminDashboard.vue")
+  },
+
+  {
     path: "/all-categories",
     name: "all-categories",
     component: () => import("@/views/AllCategories.vue")
